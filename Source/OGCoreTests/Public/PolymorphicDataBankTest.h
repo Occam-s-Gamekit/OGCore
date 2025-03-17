@@ -44,7 +44,6 @@ struct FOGTestDataBank : public FOGPolymorphicDataBankBase
 	GENERATED_BODY()
 
 	virtual UScriptStruct* GetInnerStruct() const override {return FOGTestPolymorphicData_Base::StaticStruct();}
-	virtual FOGPolymorphicStructCache*  GetStructCache() const override;
 };
 
 template<>
@@ -62,7 +61,6 @@ struct FOGTestDataBank_Delta : public FOGPolymorphicDataBankBase
 	GENERATED_BODY()
 
 	virtual UScriptStruct* GetInnerStruct() const override {return FOGTestPolymorphicData_Base::StaticStruct();}
-	virtual FOGPolymorphicStructCache*  GetStructCache() const override;
 };
 
 template<>

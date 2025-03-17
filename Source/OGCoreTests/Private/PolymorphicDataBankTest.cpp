@@ -40,18 +40,3 @@ bool PolymorphicDataBankTest::RunTest(const FString& Parameters)
 	// Make the test pass by returning true, or fail by returning false.
 	return true;
 }
-
-//TODO: handle the type::index map in module code instead of per group type
-static FOGPolymorphicStructCache CachedTypes;
-
-FOGPolymorphicStructCache* FOGTestDataBank::GetStructCache() const
-{
-	CachedTypes.InitTypeCache(GetInnerStruct());
-	return &CachedTypes;
-}
-
-FOGPolymorphicStructCache* FOGTestDataBank_Delta::GetStructCache() const
-{
-	CachedTypes.InitTypeCache(GetInnerStruct());
-	return &CachedTypes;
-}

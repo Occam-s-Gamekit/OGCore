@@ -28,13 +28,16 @@ struct OGCORE_API FOGPolymorphicStructCache
 	
 	uint16 GetIndexForType(const UScriptStruct* Type)
 	{
-		return Algo::BinarySearchBy(CachedStructTypes, Type->GetName().ToLower(),
+		const int Index = Algo::BinarySearchBy(CachedStructTypes, Type->GetName().ToLower(),
 			[](const TWeakObjectPtr<UScriptStruct>& A){return A->GetName().ToLower();},
 			[](const FString& Rhs, const FString& Lhs){return Rhs > Lhs;});
+		ensureAlways(Index != INDEX_NONE);
+		return Index;
 	}
 	
 	UScriptStruct* GetTypeForIndex(const uint16& Index)
 	{
+		ensureAlways(CachedStructTypes.Num() > Index);
 		return CachedStructTypes[Index].Get();
 	}
 
@@ -188,7 +191,7 @@ struct OGCORE_API FOGPolymorphicDataBankBase
 		MarkDirty(NewEntry.Get());
 		DataMap.Add(Key, NewEntry);
 #if WITH_EDITOR
-		CurrentStructs.Add(Derived::StaticStruct()->GetStructCPPName());
+		AvailableDataTypes.Add(Derived::StaticStruct()->GetStructCPPName());
 #endif
 	}
 
@@ -232,7 +235,10 @@ struct OGCORE_API FOGPolymorphicDataBankBase
 private:
 
 	virtual UScriptStruct* GetInnerStruct() const PURE_VIRTUAL(FOGPolymorphicDataBankBase::GetInnerStruct, return nullptr;);
-	virtual FOGPolymorphicStructCache*  GetStructCache() const PURE_VIRTUAL(FOGPolymorphicDataBankBase::GetStructCache, return nullptr;);
+	// Get the specific cache that translates a UScriptStruct to index and back.
+	// default implementation gives a cache that covers every struct type that inherits from FOGPolymorphicStructBase.
+	// Provide your own cache to improve lookup performance.
+	virtual FOGPolymorphicStructCache* GetStructCache() const;
 	
 	FORCEINLINE uint16 GetKey(const UScriptStruct* ScriptStruct) const
 	{
@@ -263,7 +269,8 @@ private:
 	uint16 LastReplicationKey = 0;
 
 #if WITH_EDITORONLY_DATA
+	//This set is maintained in editor to make it easy to tell what structs are currently in the data bank
 	UPROPERTY(Transient)
-	TSet<FString> CurrentStructs;
+	TSet<FString> AvailableDataTypes;
 #endif
 };

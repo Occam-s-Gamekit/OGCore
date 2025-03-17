@@ -3,6 +3,7 @@
 
 #include "OGPolymorphicDataBank.h"
 
+#include "OGCoreModule.h"
 #include "Engine/PackageMapClient.h"
 #include "Net/RepLayout.h"
 
@@ -12,7 +13,7 @@ void FOGPolymorphicDataBankBase::Empty()
 	GuidReferencesMap.Empty();
 	++LastReplicationKey;
 #if WITH_EDITOR
-	CurrentStructs.Empty();
+	AvailableDataTypes.Empty();
 #endif
 }
 
@@ -433,6 +434,11 @@ bool FOGPolymorphicDataBankBase::NetDeltaSerialize(FNetDeltaSerializeInfo& Delta
 	return true;
 }
 
+FOGPolymorphicStructCache* FOGPolymorphicDataBankBase::GetStructCache() const
+{
+	return FOGCoreModule::GetUniversalStructCache();
+}
+
 FOGPolymorphicStructBase* FOGPolymorphicDataBankBase::Get_Internal(const uint16& Key)
 {
 	const TSharedRef<FOGPolymorphicStructBase>* Existing = DataMap.Find(Key);
@@ -472,7 +478,7 @@ FOGPolymorphicStructBase& FOGPolymorphicDataBankBase::AddUnique_Internal(const u
 	DataMap.Add(Key, NewEntry);
 
 #if WITH_EDITOR
-	CurrentStructs.Add(ScriptStruct->GetStructCPPName());
+	AvailableDataTypes.Add(ScriptStruct->GetStructCPPName());
 #endif
 	
 	return NewEntry.Get();
@@ -491,6 +497,6 @@ void FOGPolymorphicDataBankBase::Remove_Internal(const uint16& Key, const UScrip
 	{
 		NameToRemove = GetStructCache()->GetTypeForIndex(Key)->GetStructCPPName();
 	}
-	CurrentStructs.Remove(NameToRemove);
+	AvailableDataTypes.Remove(NameToRemove);
 #endif
 }
