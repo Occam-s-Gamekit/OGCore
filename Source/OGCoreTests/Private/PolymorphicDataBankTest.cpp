@@ -1,12 +1,15 @@
 ﻿/// Copyright Occam's Gamekit contributors 2025
 
 #include "PolymorphicDataBankTest.h"
-#include "Misc/AutomationTest.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(PolymorphicDataBankTest, "BaseProject.Source.BaseProject.PolymorphicStruct.PolymorphicDataBankTest",
+#include "Engine/StaticMeshActor.h"
+#include "Misc/AutomationTest.h"
+#include "Tests/AutomationCommon.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPolymorphicDataBankTest, "OccamsGamekit.OGCore.OGPolymorphicDataBank.BasicUsage",
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool PolymorphicDataBankTest::RunTest(const FString& Parameters)
+bool FPolymorphicDataBankTest::RunTest(const FString& Parameters)
 {
 	//Test 1: Basic storage, retrieval, deletion
 	{

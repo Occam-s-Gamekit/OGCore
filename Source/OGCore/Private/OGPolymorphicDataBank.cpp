@@ -17,9 +17,23 @@ void FOGPolymorphicDataBankBase::Empty()
 #endif
 }
 
+void FOGPolymorphicDataBankBase::AddStructReferencedObjects(FReferenceCollector& Collector)
+{
+	const FOGPolymorphicStructCache* StructCache = GetStructCache();
+	if(!ensure(StructCache))
+		return;
+	for (auto& [Key, SharedDataRef] : DataMap)
+	{
+		const UScriptStruct* Struct = StructCache->GetTypeForIndex(Key);
+		if (!ensure(Struct))
+			continue;
+		Collector.AddPropertyReferencesWithStructARO(Struct, &SharedDataRef.Get());
+	}
+}
+
 bool FOGPolymorphicDataBankBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
 {
-	FOGPolymorphicStructCache* StructCache = GetStructCache();
+	const FOGPolymorphicStructCache* StructCache = GetStructCache();
 	if(!ensure(StructCache)) [[unlikely]]
 		return false;
 	ensure(DataMap.Num() <= 255);

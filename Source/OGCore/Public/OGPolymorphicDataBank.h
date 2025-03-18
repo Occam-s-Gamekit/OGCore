@@ -26,7 +26,7 @@ struct OGCORE_API FOGPolymorphicStructCache
 		CachedStructTypes.Sort([](const TWeakObjectPtr<UScriptStruct>& A, const TWeakObjectPtr<UScriptStruct>& B) { return A->GetName().ToLower() > B->GetName().ToLower(); });
 	}
 	
-	uint16 GetIndexForType(const UScriptStruct* Type)
+	uint16 GetIndexForType(const UScriptStruct* Type) const
 	{
 		const int Index = Algo::BinarySearchBy(CachedStructTypes, Type->GetName().ToLower(),
 			[](const TWeakObjectPtr<UScriptStruct>& A){return A->GetName().ToLower();},
@@ -35,7 +35,7 @@ struct OGCORE_API FOGPolymorphicStructCache
 		return Index;
 	}
 	
-	UScriptStruct* GetTypeForIndex(const uint16& Index)
+	UScriptStruct* GetTypeForIndex(const uint16& Index) const
 	{
 		ensureAlways(CachedStructTypes.Num() > Index);
 		return CachedStructTypes[Index].Get();
@@ -132,7 +132,11 @@ protected:
  *
  * Your implementation of MyDataBank must implement these two methods
  * GetInnerStruct must return the UScriptStruct of the root type of the structs this will hold.
- * GetStructCache must return a single FOGPolymorphicStructCache that is maintained by the module for this class.
+ * Optionally implement GetStructCache to return a single FOGPolymorphicStructCache that is maintained by the module for this class.
+ *	The default implementation of GetStructCache returns a universal StructCache that maps every struct which derives from FOGPolymorphicStructBase
+ *
+ * In order for garbage collection to work properly with structs inside the data bank (i.e. respect object pointers in UPROPERTY in stored structs)
+ * MyDataBank must use the WithAddStructReferencedObjects type trait.
  *
  * If MyDataBank is going to replicate, you must apply the type trait WithNetSerializer or WithNetDeltaSerializer (Or both)
  * The actual implementations for delta and non-delta serialization are already done, you only need the trait to inform the engine.
@@ -228,7 +232,8 @@ struct OGCORE_API FOGPolymorphicDataBankBase
 	}
 
 	void Empty();
-	
+
+	void AddStructReferencedObjects(class FReferenceCollector& Collector);
 	bool NetSerialize(FArchive& Ar, class UPackageMap* Map, bool&bOutSuccess);
 	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParams);
 

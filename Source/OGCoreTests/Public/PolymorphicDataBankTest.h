@@ -35,7 +35,16 @@ struct FOGTestPolymorphicData_Actor : public FOGTestPolymorphicData_Base
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadWrite)
-	TWeakObjectPtr<AActor> TestActor = nullptr;
+	TObjectPtr<AActor> TestActor = nullptr;
+};
+
+USTRUCT(BlueprintType)
+struct FOGTestPolymorphicData_Object : public FOGTestPolymorphicData_Base
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+	TObjectPtr<UObject> TestObject = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -51,6 +60,7 @@ struct TStructOpsTypeTraits<FOGTestDataBank> : public TStructOpsTypeTraitsBase2<
 {
 	enum
 	{
+		WithAddStructReferencedObjects = true,
 		WithNetSerializer = true,
 	};
 };
@@ -68,6 +78,7 @@ struct TStructOpsTypeTraits<FOGTestDataBank_Delta> : public TStructOpsTypeTraits
 {
 	enum
 	{
+		WithAddStructReferencedObjects = true,
 		WithNetDeltaSerializer = true,
 	};
 };
