@@ -7,6 +7,34 @@
 #include "Engine/PackageMapClient.h"
 #include "Net/RepLayout.h"
 
+FOGPolymorphicDataBankBase::FOGPolymorphicDataBankBase(const FOGPolymorphicDataBankBase& Other)
+{
+	DataMap.Reserve(Other.DataMap.Num());
+	const FOGPolymorphicStructCache* StructCache = GetStructCache();
+	for (auto& [Key, SharedRef] : Other.DataMap)
+	{
+		const UScriptStruct* Struct = StructCache->GetTypeForIndex(Key);
+		FOGPolymorphicStructBase* DataPtr = &AddUnique_Internal(Key, Struct);
+		Struct->CopyScriptStruct(DataPtr, &SharedRef.Get());
+		MarkDirty(*DataPtr);
+	}
+}
+
+FOGPolymorphicDataBankBase& FOGPolymorphicDataBankBase::operator=(const FOGPolymorphicDataBankBase& Other)
+{
+	DataMap.Empty();
+	DataMap.Reserve(Other.DataMap.Num());
+	const FOGPolymorphicStructCache* StructCache = GetStructCache();
+	for (auto& [Key, SharedRef] : Other.DataMap)
+	{
+		const UScriptStruct* Struct = StructCache->GetTypeForIndex(Key);
+		FOGPolymorphicStructBase* DataPtr = &AddUnique_Internal(Key, Struct);
+		Struct->CopyScriptStruct(DataPtr, &SharedRef.Get());
+		MarkDirty(*DataPtr);
+	}
+	return *this;
+}
+
 void FOGPolymorphicDataBankBase::Empty()
 {
 	DataMap.Empty();
@@ -22,12 +50,12 @@ void FOGPolymorphicDataBankBase::AddStructReferencedObjects(FReferenceCollector&
 	const FOGPolymorphicStructCache* StructCache = GetStructCache();
 	if(!ensure(StructCache))
 		return;
-	for (auto& [Key, SharedDataRef] : DataMap)
+	for (auto& [Key, SharedRef] : DataMap)
 	{
 		const UScriptStruct* Struct = StructCache->GetTypeForIndex(Key);
 		if (!ensure(Struct))
 			continue;
-		Collector.AddPropertyReferencesWithStructARO(Struct, &SharedDataRef.Get());
+		Collector.AddPropertyReferencesWithStructARO(Struct, &SharedRef.Get());
 	}
 }
 
@@ -42,7 +70,7 @@ bool FOGPolymorphicDataBankBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bo
 	
 	if (Ar.IsSaving())
 	{
-		for (auto& [StructKey, SharedDataRef] : DataMap)
+		for (auto& [StructKey, SharedRef] : DataMap)
 		{
 			UScriptStruct* Struct = StructCache->GetTypeForIndex(StructKey);
 			Ar << StructKey;
@@ -50,7 +78,7 @@ bool FOGPolymorphicDataBankBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bo
 				return false;
 			if (Struct->StructFlags & STRUCT_NetSerializeNative)
 			{
-				Struct->GetCppStructOps()->NetSerialize(Ar, Map, bOutSuccess, &SharedDataRef.Get());
+				Struct->GetCppStructOps()->NetSerialize(Ar, Map, bOutSuccess, &SharedRef.Get());
 			}
 			else
 			{
@@ -66,7 +94,7 @@ bool FOGPolymorphicDataBankBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bo
 				check(RepLayout.IsValid());
 
 				bool bHasUnmapped = false;
-				RepLayout->SerializePropertiesForStruct(Struct, static_cast<FBitArchive&>(Ar), Map, &SharedDataRef.Get(), bHasUnmapped);
+				RepLayout->SerializePropertiesForStruct(Struct, static_cast<FBitArchive&>(Ar), Map, &SharedRef.Get(), bHasUnmapped);
 				bOutSuccess = true;
 			}
 		}
@@ -206,7 +234,7 @@ bool FOGPolymorphicDataBankBase::NetDeltaSerialize(FNetDeltaSerializeInfo& Delta
 					DeltaParams.bCalledPreNetReceive = true;
 				}
 
-				FOGPolymorphicStructBase* ThisElement = &DataMap.FindChecked( StructKey ).Get();
+				FOGPolymorphicStructBase& ThisElement = DataMap.FindChecked( StructKey ).Get();
 
 				ChangedIndices.Add(StructKey);
 
@@ -215,7 +243,7 @@ bool FOGPolymorphicDataBankBase::NetDeltaSerialize(FNetDeltaSerializeInfo& Delta
 
 				// Read the property (which should serialize any newly mapped objects as well)
 				DeltaParams.Struct = GetStructCache()->GetTypeForIndex(StructKey);
-				DeltaParams.Data = ThisElement;
+				DeltaParams.Data = &ThisElement;
 				DeltaParams.Reader = &Reader;
 				DeltaParams.NetSerializeCB->NetSerializeStruct(DeltaParams);
 
@@ -458,11 +486,9 @@ FOGPolymorphicStructBase* FOGPolymorphicDataBankBase::Get_Internal(const uint16&
 	const TSharedRef<FOGPolymorphicStructBase>* Existing = DataMap.Find(Key);
 	if (!Existing)
 		return nullptr;
-	FOGPolymorphicStructBase* ExistingTyped = &Existing->Get();
-	if (!ensure(ExistingTyped)) [[unlikely]]
-		return nullptr;
-	MarkDirty(*ExistingTyped);
-	return ExistingTyped;
+	FOGPolymorphicStructBase& ExistingTyped = Existing->Get();
+	MarkDirty(ExistingTyped);
+	return &ExistingTyped;
 }
 
 const FOGPolymorphicStructBase* FOGPolymorphicDataBankBase::GetConst_Internal(const uint16& Key) const
@@ -470,16 +496,14 @@ const FOGPolymorphicStructBase* FOGPolymorphicDataBankBase::GetConst_Internal(co
 	const TSharedRef<FOGPolymorphicStructBase>* Existing = DataMap.Find(Key);
 	if (!Existing)
 		return nullptr;
-	const FOGPolymorphicStructBase* ExistingTyped = &Existing->Get();
-	if (!ensure(ExistingTyped)) [[unlikely]]
-		return nullptr;
-	return ExistingTyped;
+	const FOGPolymorphicStructBase& ExistingTyped = Existing->Get();
+	return &ExistingTyped;
 }
 
 FOGPolymorphicStructBase& FOGPolymorphicDataBankBase::AddUnique_Internal(const uint16& Key,
 	const UScriptStruct* ScriptStruct)
 {
-	if (!ensureMsgf(!DataMap.Contains(Key), TEXT("Tried adding a unique type, but type already exsists"))) [[unlikely]]
+	if (!ensureAlwaysMsgf(!DataMap.Contains(Key), TEXT("Tried adding a unique type, but type already exsists"))) [[unlikely]]
 		return *Get_Internal(Key);
 	//Cannot use the more convenient MakeShared<FOGPolymorphicStructBase> because when dealing with BP we will have access to the script struct but not the type
 	FOGPolymorphicStructBase* NewStructPtr = static_cast<FOGPolymorphicStructBase*>(FMemory::MallocZeroed(ScriptStruct->GetCppStructOps()->GetSize(), ScriptStruct->GetCppStructOps()->GetAlignment()));
@@ -487,15 +511,14 @@ FOGPolymorphicStructBase& FOGPolymorphicDataBankBase::AddUnique_Internal(const u
 	{
 		ScriptStruct->GetCppStructOps()->Construct(NewStructPtr);
 	}
-	const TSharedRef<FOGPolymorphicStructBase> NewEntry = TSharedRef<FOGPolymorphicStructBase>(NewStructPtr);
-	MarkDirty(NewEntry.Get());
-	DataMap.Add(Key, NewEntry);
+	MarkDirty(*NewStructPtr);
+	DataMap.Add(Key, TSharedRef<FOGPolymorphicStructBase>(NewStructPtr));
 
 #if WITH_EDITOR
 	AvailableDataTypes.Add(ScriptStruct->GetStructCPPName());
 #endif
 	
-	return NewEntry.Get();
+	return *NewStructPtr;
 }
 
 void FOGPolymorphicDataBankBase::Remove_Internal(const uint16& Key, const UScriptStruct* ScriptStruct)

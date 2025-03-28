@@ -26,6 +26,7 @@ struct OGCORE_API FOGHandleBase
 public:
 
 	FOGHandleBase() {}
+	virtual ~FOGHandleBase() {}
 	FOGHandleBase(OGHandleIdType InHandle) : Handle(InHandle) {}
 	FOGHandleBase(const FOGHandleBase& Other) : Handle(Other.Handle) {}
 	FOGHandleBase(const FOGHandleBase&& Other) noexcept : Handle(Other.Handle) {}
@@ -50,9 +51,14 @@ public:
 		return EmptyHandle;
 	}
 
-	bool IsValid() const
+	virtual bool IsValid() const
 	{
 		return Handle != 0;
+	}
+
+	virtual void Reset()
+	{
+		Handle = 0;
 	}
 
 	void operator=(const FOGHandleBase& Other)

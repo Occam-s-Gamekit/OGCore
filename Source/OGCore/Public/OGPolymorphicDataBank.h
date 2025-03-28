@@ -160,6 +160,10 @@ struct OGCORE_API FOGPolymorphicDataBankBase
 	FOGPolymorphicDataBankBase() {}
 	virtual ~FOGPolymorphicDataBankBase() {}
 
+	//Deep copy the data bank
+	FOGPolymorphicDataBankBase(const FOGPolymorphicDataBankBase& Other);
+	FOGPolymorphicDataBankBase& operator=(const FOGPolymorphicDataBankBase& Other);
+
 	template <typename Derived UE_REQUIRES(std::is_base_of_v<FOGPolymorphicStructBase, Derived>)>
 	bool Contains() const
 	{
@@ -170,30 +174,31 @@ struct OGCORE_API FOGPolymorphicDataBankBase
 	template <typename Derived UE_REQUIRES(std::is_base_of_v<FOGPolymorphicStructBase, Derived>)>
 	Derived& AddUnique()
 	{
-		return static_cast<Derived&>(AddUnique_Internal(GetKey(Derived::StaticStruct()),Derived::StaticStruct()));
+		const UScriptStruct* Struct = Derived::StaticStruct();
+		return static_cast<Derived&>(AddUnique_Internal(GetKey(Struct),Struct));
 	}
 
 	template <typename Derived UE_REQUIRES(std::is_base_of_v<FOGPolymorphicStructBase, Derived>)>
 	void Remove()
 	{
-		const uint16 Key = GetKey(Derived::StaticStruct());
-		Remove_Internal(Key, Derived::StaticStruct());
+		const UScriptStruct* Struct = Derived::StaticStruct();
+		const uint16 Key = GetKey(Struct);
+		Remove_Internal(Key, Struct);
 	}
 	
 	template <typename Derived UE_REQUIRES(std::is_base_of_v<FOGPolymorphicStructBase, Derived>)>
 	void SetByCopy(const Derived& Source)
 	{
+		const UScriptStruct* Struct = Derived::StaticStruct();
 		const uint16 Key = GetKey(Derived::StaticStruct());
-		if (Derived* Existing = static_cast<Derived*>(Get_Internal(Key)))
+		Derived* Existing = static_cast<Derived*>(Get_Internal(Key));
+		if (!Existing)
 		{
-			*Existing = Source;
-			//Override replication key in source
-			MarkDirty(*Existing);
-			return;
+			Existing = static_cast<Derived*>(&AddUnique_Internal(Key, Struct));
 		}
-		TSharedRef<Derived> NewEntry = MakeShared<Derived>(Source);
-		MarkDirty(NewEntry.Get());
-		DataMap.Add(Key, NewEntry);
+		*Existing = Source;
+		//Override replication key in source
+		MarkDirty(*Existing);
 #if WITH_EDITOR
 		AvailableDataTypes.Add(Derived::StaticStruct()->GetStructCPPName());
 #endif
@@ -202,31 +207,34 @@ struct OGCORE_API FOGPolymorphicDataBankBase
 	template <typename Derived UE_REQUIRES(std::is_base_of_v<FOGPolymorphicStructBase, Derived>)>
 	Derived& GetSafe()
 	{
-		const uint16 Key = GetKey(Derived::StaticStruct());
+		const UScriptStruct* Struct = Derived::StaticStruct();
+		const uint16 Key = GetKey(Struct);
 		if (Derived* Existing = static_cast<Derived*>(Get_Internal(Key)))
 		{
 			return *Existing;
 		}
-		return static_cast<Derived&>(AddUnique_Internal(Key, Derived::StaticStruct()));
+		return static_cast<Derived&>(AddUnique_Internal(Key, Struct));
 	}
 	
 	template <typename Derived UE_REQUIRES(std::is_base_of_v<FOGPolymorphicStructBase, Derived>)>
 	const Derived& GetConstChecked() const
 	{
-		const uint16 Key = GetKey(Derived::StaticStruct());
+		const UScriptStruct* Struct = Derived::StaticStruct();
+		const uint16 Key = GetKey(Struct);
 		const Derived* Existing = static_cast<const Derived*>(GetConst_Internal(Key));
 		if (!ensureAlwaysMsgf(Existing, TEXT("Tried getting a ref for a type that's not in the bank"))) [[unlikely]]
-			return static_cast<Derived&>(const_cast<FOGPolymorphicDataBankBase*>(this)->AddUnique_Internal(Key, Derived::StaticStruct()));
+			return static_cast<Derived&>(const_cast<FOGPolymorphicDataBankBase*>(this)->AddUnique_Internal(Key, Struct));
 		return *Existing;
 	}
 
 	template <typename Derived UE_REQUIRES(std::is_base_of_v<FOGPolymorphicStructBase, Derived>)>
 	Derived& GetChecked()
 	{
-		const uint16 Key = GetKey(Derived::StaticStruct());
+		const UScriptStruct* Struct = Derived::StaticStruct();
+		const uint16 Key = GetKey(Struct);
 		Derived* Existing = static_cast<Derived*>(Get_Internal(Key));
 		if (!ensureAlwaysMsgf(Existing, TEXT("Tried getting a ref for a type that's not in the bank"))) [[unlikely]]
-			return static_cast<Derived&>(AddUnique_Internal(Key, Derived::StaticStruct()));
+			return static_cast<Derived&>(AddUnique_Internal(Key, Struct));
 		Derived& ExistingRef = *Existing;
 		return ExistingRef;
 	}
@@ -262,9 +270,8 @@ private:
 	const FOGPolymorphicStructBase* GetConst_Internal(const uint16& Key) const;
 	
 	FOGPolymorphicStructBase& AddUnique_Internal(const uint16& Key, const UScriptStruct* ScriptStruct);
-
-	void Remove_Internal(const uint16& Key, const UScriptStruct* ScriptStruct = nullptr);
 	
+	void Remove_Internal(const uint16& Key, const UScriptStruct* ScriptStruct = nullptr);
 	TMap<uint16, TSharedRef<FOGPolymorphicStructBase>> DataMap;
 
 	/** List of items that need to be re-serialized when the referenced objects are mapped */
@@ -275,7 +282,7 @@ private:
 
 #if WITH_EDITORONLY_DATA
 	//This set is maintained in editor to make it easy to tell what structs are currently in the data bank
-	UPROPERTY(Transient)
+	UPROPERTY(Transient, NotReplicated)
 	TSet<FString> AvailableDataTypes;
 #endif
 };
