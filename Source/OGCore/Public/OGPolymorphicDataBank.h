@@ -239,6 +239,22 @@ struct OGCORE_API FOGPolymorphicDataBankBase
 		return ExistingRef;
 	}
 
+	template <typename Derived UE_REQUIRES(std::is_base_of_v<FOGPolymorphicStructBase, Derived>)>
+	const Derived* FindConst() const
+	{
+		const UScriptStruct* Struct = Derived::StaticStruct();
+		const uint16 Key = GetKey(Struct);
+		return static_cast<const Derived*>(GetConst_Internal(Key));
+	}
+
+	template <typename Derived UE_REQUIRES(std::is_base_of_v<FOGPolymorphicStructBase, Derived>)>
+	Derived* Find()
+	{
+		const UScriptStruct* Struct = Derived::StaticStruct();
+		const uint16 Key = GetKey(Struct);
+		return static_cast<Derived*>(Get_Internal(Key));
+	}
+
 	void Empty();
 
 	void AddStructReferencedObjects(class FReferenceCollector& Collector);
